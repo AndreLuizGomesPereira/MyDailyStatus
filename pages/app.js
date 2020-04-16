@@ -2,6 +2,7 @@ import React, { useEffect } from 'react'
 import auth0 from '../lib/auth0'
 import router from 'next/router'
 import { db } from '../lib/db'
+import { distance } from '../lib/geo'
 
 const App = props => {
     useEffect(() => {
@@ -16,8 +17,19 @@ const App = props => {
     }
     return (
         <div>
-            <h1>App</h1>
-            <pre>{JSON.stringify(props, null, 2)}</pre>
+            <h1>Status próximpo a você:</h1>
+            <table>
+                {props.checkins.map(checkin => {
+                    return (
+                        <tr>
+                            <td>{checkin.id === props.user.sub && 'Seu Status: '}</td>
+                            <td>{checkin.status}</td>
+                            <td>{JSON.stringify(checkin.coords)}</td>
+                            <td>{checkin.distance} Km</td>
+                        </tr>
+                    )
+                })}
+            </table>
         </div>
     )
 }
@@ -48,9 +60,31 @@ export async function getServerSideProps({ req, res }) {
                     center: todaysData.coordinates,
                     radius: 1000
                 })
-            checkins.docs.forEach(docs => {
-                console.log(doc.id, doc.data())
-            });
+                .get()
+            const checkinsList = []
+            checkins.docs.forEach(doc => {
+                checkinsList.push({
+                    id: doc.id,
+                    status: doc.data().status,
+                    coords: {
+                        lat: doc.data().coordinates.latitude,
+                        long: doc.data().coordinates.longitude
+                    },
+                    distance: distance(
+                        todaysData.coordinates.latitude,
+                        todaysData.coordinates.longitude,
+                        doc.data().coordinates.latitude,
+                        doc.data().coordinates.longitude)
+                }).toFixed(3)
+            })
+            return {
+                props: {
+                    isAuth: true,
+                    user: session.user,
+                    forceCreate: false,
+                    checkins: checkinsList
+                }
+            }
         }
         return {
             props: {
